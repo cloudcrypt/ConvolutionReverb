@@ -10,9 +10,9 @@
             "request": "launch",
             "program": "${workspaceFolder}/TimeDomainConvolve.exe",
             "args": [
-                "tone.wav",
-                "asdf",
-                "testoutput.wav"
+                "ShortFluteDry.wav",
+                "BIG HALL E001 M2S.wav",
+                "convolved.wav"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
