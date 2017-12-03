@@ -71,70 +71,15 @@ int main(int argc, char *argv[]) {
     WavFile *inputWav = malloc(size);
     fseek(inputFile, 0, SEEK_SET);
     fread(inputWav, 1, size, inputFile);
-    
-    //int16_t sample = *((int16_t *)(&inputWav->dataChunk.data)+1);
-    //int16_t sampleData = *(inputWav->dataChunk.data + 1);
-    //int16_t *samples = (int16_t *)&inputWav->dataChunk.data;
-    //int16_t **samplesP = &inputWav->dataChunk.data;
-    
-
-    for (int i = 0; i < 8; i++) {
-        //int16_t sampleData = *(inputWav->dataChunk.data + 1);
-        //printf("%x\n", *(inputWav->dataChunk.data + i));
-        
-        //printf("%x\n", *(samples + i));
-    }
-
-    printf("------\n");
 
     int numSamples = inputWav->dataChunk.chunkSize / (BITS_PER_SAMPLE / 8);
     float *x = malloc(sizeof(float) * numSamples);
     scaleSamples(inputWav->dataChunk.data, numSamples, x);
-    //scaleSamples(samples, numSamples, x);
-
-    //int16_t *original = malloc(sizeof(float) * numSamples);
-    for (int i = 0; i < numSamples; i++) {
-        *(x + i) = *(x + i) / (float)2;
-    }
     // for (int i = 0; i < numSamples; i++) {
-    //     *(original + i) = 0xbabe;
+    //     *(x + i) = *(x + i) / (float)2;
     // }
     unscaleSamples(x, numSamples, inputWav->dataChunk.data);
-    //unscaleSamples(x, numSamples, original);
 
-    //(inputWav->dataChunk.data) = 1234;
-
-    //&inputWav->dataChunk.data = original;
-    //inputWav->dataChunk.data = original;
-    //samples = original;
-    //inputWav->dataChunk.data = (int16_t *)original;
-    //*samplesP = original;
-
-    for (int i = 0; i < 8; i++) {
-        //int16_t sampleData = *(inputWav->dataChunk.data + 1);
-        //printf("%x\n", *(inputWav->dataChunk.data + i));
-        //printf("%x\n", *(original + i));
-    }
-
-    printf("------\n");
-
-    for (int i = 0; i < 8; i++) {
-        //int16_t sampleData = *(inputWav->dataChunk.data + 1);
-        //printf("%x\n", *(inputWav->dataChunk.data + i));
-        
-        //printf("%x\n", *(samples + i));
-    }
-
-    printf("------\n");
-
-    for (int i = 0; i < 8; i++) {
-        //printf("%x\n", *((int16_t *)&inputWav->dataChunk.data + i));
-    }
-    // for (int i = 0; i < 8; i++) {
-    //     printf("%x\n", *(original + i));
-    //     //printf("%x\n", (int)rintf(*(x + i) * maxValue));
-    // }
-    //reverseEndianness(sizeof(int), &inputWav->header.chunkSize);
     createWavFile(outputFileName, inputWav);
 
     return 0;
@@ -169,7 +114,7 @@ void createWavFile(char* fileName, WavFile *wavFile) {
     // reverseEndianness(sizeof(int), &wavFile->header.fmtChunk.byteRate);
     // reverseEndianness(sizeof(int16_t), &wavFile->header.fmtChunk.blockAlign);
     // reverseEndianness(sizeof(int16_t), &wavFile->header.fmtChunk.bitsPerSample); 
-    //reverseEndianness(sizeof(int), &wavFile->dataChunk.chunkSize);
+    // reverseEndianness(sizeof(int), &wavFile->dataChunk.chunkSize);
 
     fwrite(&wavFile->header, sizeof(WavHeader), 1, outputFile);
     fwrite(wavFile->dataChunk.chunkId, sizeof(char), 4, outputFile);
