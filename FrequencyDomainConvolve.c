@@ -6,7 +6,8 @@
 #include <time.h>
 
 /*  Standard sample size in bits  */
-#define BITS_PER_SAMPLE     16         
+#define BITS_PER_SAMPLE     16       
+#define SWAP(a,b)  tempr=(a);(a)=(b);(b)=tempr  
 
 typedef struct FmtChunk {
     char chunkId[4];
@@ -39,10 +40,10 @@ typedef struct WavFile {
     DataChunk *dataChunk;
 } WavFile;
 
-void convolve(float x[], int N, float h[], int M, float y[], int P);
+void four1(double data[], int nn, int isign);
 WavFile* loadWav(char* fileName);
-void scaleSamples(int16_t samples[], int numSamples, float scaled[]);
-void unscaleSamples(float scaled[], int numSamples, int16_t samples[]);
+void scaleSamplesComplex(int16_t samples[], int numSamples, double scaled[]);
+void unscaleSamplesComplex(double scaled[], int numSamples, int16_t samples[]);
 void createWavFile(char* fileName, WavFile *wavFile);
 void reverseEndianness(int size, void *value);
 
@@ -76,28 +77,37 @@ int main(int argc, char *argv[]) {
     clock_t initial = clock();
 
     int inputSamples = inputWav->dataChunk->chunkSize / (BITS_PER_SAMPLE / 8);
-    float *x = malloc(sizeof(float) * inputSamples);
-    scaleSamples(inputWav->dataChunk->data, inputSamples, x);
-
     int impulseSamples = impulseWav->dataChunk->chunkSize / (BITS_PER_SAMPLE / 8);
-    float *h = malloc(sizeof(float) * impulseSamples);
-    scaleSamples(impulseWav->dataChunk->data, impulseSamples, h);
+
+    uint64_t neededLength = (inputSamples > impulseSamples ? inputSamples : impulseSamples) * 2;
+    neededLength = pow(2, ceil(log(neededLength)/log(2)));
+
+    double *x = calloc(neededLength, sizeof(double));
+    scaleSamplesComplex(inputWav->dataChunk->data, inputSamples, x);
+    four1(x - 1, neededLength / 2, 1);
+
+    double *h = calloc(neededLength, sizeof(double));
+    scaleSamplesComplex(impulseWav->dataChunk->data, impulseSamples, h);
+    four1(h - 1, neededLength / 2, 1);
+
+    double *f = calloc(neededLength, sizeof(double));
+    for (int i = 0; i < neededLength; i+=2) {
+        *(f + i) = (*(x + i) * *(h + i)) - (*(x + i + 1) * *(h + i + 1));
+        *(f + i + 1) = (*(x + i + 1) * *(h + i)) + (*(x + i) * *(h + i + 1));
+    }
+    four1(f - 1, neededLength / 2, -1);
+
+    for (int i = 0; i < neededLength; i+=2) {
+        *(f + i) = *(f + i) / (double)neededLength;
+        *(f + i + 1) = *(f + i + 1) / (double)neededLength;
+    }
 
     int convolvedSamples = inputSamples + impulseSamples - 1;
-    float *y = malloc(sizeof(float) * convolvedSamples);
-
-    convolve(x, inputSamples, h, impulseSamples, y, convolvedSamples);
-
-    // for (int i = 0; i < convolvedSamples; i++) {
-    //     float sample = *(y + i);
-    //     *(y + i) = sample > 0.9f ? 0.9f : sample;
-    // }
-
     int addedBytes = (convolvedSamples - inputSamples) * (BITS_PER_SAMPLE / 8);
     inputWav->header->chunkSize += addedBytes;
     inputWav->dataChunk->chunkSize += addedBytes;
     inputWav->dataChunk = realloc(inputWav->dataChunk, inputWav->dataChunk->chunkSize + 8);
-    unscaleSamples(y, convolvedSamples, inputWav->dataChunk->data);
+    unscaleSamplesComplex(f, convolvedSamples, inputWav->dataChunk->data);
 
     double elapsed = (clock() - initial) / (double)CLOCKS_PER_SEC;
     printf("Convolution completed in %.4f seconds\n", elapsed);
@@ -107,38 +117,51 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-void convolve(float x[], int N, float h[], int M, float y[], int P) {
-    int n, m;
+void four1(double data[], int nn, int isign) {
+    unsigned long n, mmax, m, j, istep, i;
+    double wtemp, wr, wpr, wpi, wi, theta;
+    double tempr, tempi;
 
-    /*  Make sure the output buffer is the right size: P = N + M - 1  */
-    if (P != (N + M - 1)) {
-        printf("Output signal vector is the wrong size\n");
-        printf("It is %-d, but should be %-d\n", P, (N + M - 1));
-        printf("Aborting convolution\n");
-        return;
+    n = nn << 1;
+    j = 1;
+
+    for (i = 1; i < n; i += 2) {
+        if (j > i) {
+            SWAP(data[j], data[i]);
+            SWAP(data[j+1], data[i+1]);
+        }
+        m = nn;
+        while (m >= 2 && j > m) {
+            j -= m;
+            m >>= 1;
+        }
+        j += m;
     }
 
-    /*  Clear the output buffer y[] to all zero values  */  
-    for (n = 0; n < P; n++)
-        y[n] = 0.0;
-
-    printf("\n");
-    /*  Do the convolution  */
-    /*  Outer loop:  process each input value x[n] in turn  */
-    uint64_t totalIterations = (uint64_t)N * (uint64_t)M;
-    uint64_t performedIterations = 0;
-    for (n = 0; n < N; n++) {
-        /*  Inner loop:  process x[n] with each sample of h[]  */
-        for (m = 0; m < M; m++) {
-            y[n+m] += x[n] * h[m];
+    mmax = 2;
+    while (n > mmax) {
+        istep = mmax << 1;
+        theta = isign * (6.28318530717959 / mmax);
+        wtemp = sin(0.5 * theta);
+        wpr = -2.0 * wtemp * wtemp;
+        wpi = sin(theta);
+        wr = 1.0;
+        wi = 0.0;
+        for (m = 1; m < mmax; m += 2) {
+            for (i = m; i <= n; i += istep) {
+                j = i + mmax;
+                tempr = wr * data[j] - wi * data[j+1];
+                tempi = wr * data[j+1] + wi * data[j];
+                data[j] = data[i] - tempr;
+                data[j+1] = data[i+1] - tempi;
+                data[i] += tempr;
+                data[i+1] += tempi;
+            }
+            wr = (wtemp = wr) * wpr - wi * wpi + wr;
+            wi = wi * wpr + wtemp * wpi + wi;
         }
-        performedIterations += M;
-        printf("\rProcessing %.4f%%...", (double)(performedIterations / (double)totalIterations) * 100);
-        if (((double)(performedIterations / (double)totalIterations) * 100) > 5) {
-            break;
-        }
+        mmax = istep;
     }
-    printf("\n");
 }
 
 WavFile* loadWav(char* fileName) {
@@ -160,16 +183,17 @@ WavFile* loadWav(char* fileName) {
     return wavFile;
 }
 
-void scaleSamples(int16_t samples[], int numSamples, float scaled[]) {
-    for (int i = 0; i < numSamples; i++) {
-        int16_t sample = *(samples + i);
+void scaleSamplesComplex(int16_t samples[], int numSamples, double scaled[]) {
+    for (int i = 0; i < (numSamples * 2); i+=2) {
+        int16_t sample = *(samples + (i / 2));
         *(scaled + i) = sample / (float)(maxValue + (sample < 0 ? 1 : 0));
+        *(scaled + i + 1) = 0.0;
     }
 }
 
-void unscaleSamples(float scaled[], int numSamples, int16_t samples[]) {
+void unscaleSamplesComplex(double scaled[], int numSamples, int16_t samples[]) {
     for (int i = 0; i < numSamples; i++) {
-        float scaledSample = *(scaled + i);
+        float scaledSample = *(scaled + (i * 2));
         *(samples + i) = (int16_t)rintf(scaledSample * (maxValue + (scaledSample < 0 ? 1 : 0)));
     }
 }

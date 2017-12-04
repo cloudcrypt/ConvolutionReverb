@@ -9,9 +9,9 @@
             "command": "gcc",
             "args":[
                 "-g",
-                "TimeDomainConvolve.c",
+                "FrequencyDomainConvolve.c",
                 "-o",
-                "TimeDomainConvolve"
+                "FrequencyDomainConvolve"
             ],
             "group": {
                 "kind": "build",
