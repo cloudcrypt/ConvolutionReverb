@@ -69,29 +69,6 @@ int main(int argc, char *argv[]) {
         exit(-1);
     }
 
-    // WavFile *inputWav = malloc(sizeof(WavFile));
-    // FILE *inputFile = fopen(inputFileName, "rb");
-    // fseek(inputFile, 0, SEEK_END);
-    // long size = ftell(inputFile);
-    // inputWav->fileBuf = malloc(size);
-    // fseek(inputFile, 0, SEEK_SET);
-    // fread(inputWav->fileBuf, 1, size, inputFile);
-    // fclose(inputFile);
-
-    // inputWav->header = (WavHeader *)inputWav->fileBuf;
-    // DataChunk* dataChunk = (DataChunk *)(inputWav->fileBuf + 20 + inputWav->header->fmtChunk.chunkSize);
-    // inputWav->dataChunk = malloc(dataChunk->chunkSize + 8);
-    // memcpy(inputWav->dataChunk, dataChunk, dataChunk->chunkSize + 8);
-    // inputWav->fileBuf = realloc(inputWav->fileBuf, inputWav->header->chunkSize + 8 - (dataChunk->chunkSize + 8));
-
-    // FILE *impulseFile = fopen(IRfileName, "rb");
-    // fseek(impulseFile, 0, SEEK_END);
-    // size = ftell(impulseFile);
-    // WavFile2 *impulseWav = malloc(size);
-    // fseek(impulseFile, 0, SEEK_SET);
-    // fread(impulseWav, 1, size, impulseFile);
-    // fclose(impulseFile);
-
     WavFile *inputWav = loadWav(inputFileName);
     WavFile *impulseWav = loadWav(IRfileName);
 
@@ -107,32 +84,12 @@ int main(int argc, char *argv[]) {
     float *y = malloc(sizeof(float) * convolvedSamples);
 
     convolve(x, inputSamples, h, impulseSamples, y, convolvedSamples);
-    // // for (int i = 0; i < numSamples; i++) {
-    // //     *(x + i) = *(x + i) / (float)2;
-    // // }
 
-    // int addedBytes = (convolvedSamples - inputSamples) * (BITS_PER_SAMPLE / 8);
-    // inputWav->header.chunkSize += addedBytes;
-    // inputWav = realloc(inputWav, inputWav->header.chunkSize + 8);
-    // inputWav->dataChunk.chunkSize += addedBytes;
-    // // for (int i = numSamples; i < (numSamples + 3); i++) {
-    // //     *(inputWav->dataChunk.data + i) = 0xbabe;
-    // // }
-    //unscaleSamples(y, convolvedSamples, inputWav->dataChunk.data);
-
-    // Working:
     int addedBytes = (convolvedSamples - inputSamples) * (BITS_PER_SAMPLE / 8);
-    //int addedBytes = 14;
     inputWav->header->chunkSize += addedBytes;
     inputWav->dataChunk->chunkSize += addedBytes;
     inputWav->dataChunk = realloc(inputWav->dataChunk, inputWav->dataChunk->chunkSize + 8);
-    //inputWav->dataChunk = realloc(inputWav->fileBuf, inputWav->header->chunkSize + 8);
-    //inputWav->dataChunk = (DataChunk *)(inputWav->fileBuf + 20 + inputWav->header->fmtChunk.chunkSize);
     unscaleSamples(y, convolvedSamples, inputWav->dataChunk->data);
-    // for (int i = inputSamples; i < (inputSamples + 7); i++) {
-    //     *(inputWav->dataChunk->data + i) = 0xbabe;
-    // }
-
 
     createWavFile(outputFileName, inputWav);
 
@@ -191,7 +148,6 @@ WavFile* loadWav(char* fileName) {
 void scaleSamples(int16_t samples[], int numSamples, float scaled[]) {
     for (int i = 0; i < numSamples; i++) {
         int16_t sample = *(samples + i);
-        //float test = sample / (float)(maxValue + (sample < 0 ? 1 : 0));
         *(scaled + i) = sample / (float)(maxValue + (sample < 0 ? 1 : 0));
     }
 }
@@ -199,7 +155,6 @@ void scaleSamples(int16_t samples[], int numSamples, float scaled[]) {
 void unscaleSamples(float scaled[], int numSamples, int16_t samples[]) {
     for (int i = 0; i < numSamples; i++) {
         float scaledSample = *(scaled + i);
-        //int16_t test = (int16_t)rintf(scaledSample * maxValue);
         *(samples + i) = (int16_t)rintf(scaledSample * (maxValue + (scaledSample < 0 ? 1 : 0)));
     }
 }
