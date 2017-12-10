@@ -47,11 +47,11 @@ void unscaleSamplesComplex(double scaled[], int numSamples, int16_t samples[]);
 void createWavFile(char* fileName, WavFile *wavFile);
 void reverseEndianness(int size, void *value);
 
-//int maxValue;
+int maxValue;
 
 int main(int argc, char *argv[]) {
 
-    //maxValue = (int)pow(2.0, (double)BITS_PER_SAMPLE - 1) - 1;
+    maxValue = (int)pow(2.0, (double)BITS_PER_SAMPLE - 1) - 1;
     
     char *inputFileName = NULL;
     char *IRfileName = NULL;
@@ -204,7 +204,6 @@ WavFile* loadWav(char* fileName) {
 }
 
 void scaleSamplesComplex(int16_t samples[], int numSamples, double scaled[]) {
-    int maxValue = ((int)pow(2.0, (double)BITS_PER_SAMPLE - 1) - 1);
     for (int i = 0; i < (numSamples * 2); i+=2) {
         int16_t sample = *(samples + (i / 2));
         *(scaled + i) = sample / (float)(maxValue + (sample < 0 ? 1 : 0));
@@ -213,7 +212,6 @@ void scaleSamplesComplex(int16_t samples[], int numSamples, double scaled[]) {
 }
 
 void unscaleSamplesComplex(double scaled[], int numSamples, int16_t samples[]) {
-    int maxValue = ((int)pow(2.0, (double)BITS_PER_SAMPLE - 1) - 1);
     for (int i = 0; i < numSamples; i++) {
         float scaledSample = *(scaled + (i * 2));
         *(samples + i) = (int16_t)rintf(scaledSample * (maxValue + (scaledSample < 0 ? 1 : 0)));
