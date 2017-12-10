@@ -93,21 +93,12 @@ int main(int argc, char *argv[]) {
     double *f = calloc(neededLength, sizeof(double));
     for (int i = 0; i < neededLength; i+=2) {
         *(f + i) = (*(x + i) * *(h + i)) - (*(x + i + 1) * *(h + i + 1));
-        //*(f + i + 1) = (*(x + i + 1) * *(h + i)) + (*(x + i) * *(h + i + 1));
-    }
-    for (int i = 0; i < neededLength; i+=2) {
-        //*(f + i) = (*(x + i) * *(h + i)) - (*(x + i + 1) * *(h + i + 1));
         *(f + i + 1) = (*(x + i + 1) * *(h + i)) + (*(x + i) * *(h + i + 1));
     }
     four1(f - 1, neededLength / 2, -1);
 
     for (int i = 0; i < neededLength; i+=2) {
         *(f + i) = *(f + i) / (double)neededLength;
-        //*(f + i + 1) = *(f + i + 1) / (double)neededLength;
-    }
-
-    for (int i = 0; i < neededLength; i+=2) {
-        //*(f + i) = *(f + i) / (double)neededLength;
         *(f + i + 1) = *(f + i + 1) / (double)neededLength;
     }
 
