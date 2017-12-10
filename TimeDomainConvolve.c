@@ -88,10 +88,22 @@ int main(int argc, char *argv[]) {
 
     convolve(x, inputSamples, h, impulseSamples, y, convolvedSamples);
 
-    // for (int i = 0; i < convolvedSamples; i++) {
-    //     float sample = *(y + i);
-    //     *(y + i) = sample > 0.9f ? 0.9f : sample;
-    // }
+    float maxSample = *y;
+
+    // get max, scale by dividing by max!
+    for (int i = 0; i < convolvedSamples; i++) {
+        float sample = *(y + i);
+        if (sample > maxSample) {
+            maxSample = sample;
+        }
+    }
+
+    float scaleFactor = (float)(maxSample + 2.0);
+
+    for (int i = 0; i < convolvedSamples; i++) {
+        float sample = *(y + i);
+        *(y + i) = sample / scaleFactor;
+    }
 
     int addedBytes = (convolvedSamples - inputSamples) * (BITS_PER_SAMPLE / 8);
     inputWav->header->chunkSize += addedBytes;
@@ -134,9 +146,6 @@ void convolve(float x[], int N, float h[], int M, float y[], int P) {
         }
         performedIterations += M;
         printf("\rProcessing %.4f%%...", (double)(performedIterations / (double)totalIterations) * 100);
-        if (((double)(performedIterations / (double)totalIterations) * 100) > 5) {
-            break;
-        }
     }
     printf("\n");
 }

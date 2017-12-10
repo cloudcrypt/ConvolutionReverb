@@ -102,6 +102,23 @@ int main(int argc, char *argv[]) {
         *(f + i + 1) = *(f + i + 1) / (double)neededLength;
     }
 
+    double maxSample = *f;
+
+    // get max, scale by dividing by max!
+    for (int i = 0; i < neededLength; i+=2) {
+        double sample = *(f + i);
+        if (sample > maxSample) {
+            maxSample = sample;
+        }
+    }
+
+    double scaleFactor = (double)(maxSample + 0.3);
+
+    for (int i = 0; i < neededLength; i++) {
+        double sample = *(f + i);
+        *(f + i) = sample / scaleFactor;
+    }
+
     int convolvedSamples = inputSamples + impulseSamples - 1;
     int addedBytes = (convolvedSamples - inputSamples) * (BITS_PER_SAMPLE / 8);
     inputWav->header->chunkSize += addedBytes;
