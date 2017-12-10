@@ -127,7 +127,11 @@ int main(int argc, char *argv[]) {
     inputWav->header->chunkSize += addedBytes;
     inputWav->dataChunk->chunkSize += addedBytes;
     inputWav->dataChunk = realloc(inputWav->dataChunk, inputWav->dataChunk->chunkSize + 8);
-    unscaleSamplesComplex(f, convolvedSamples, inputWav->dataChunk->data);
+    //unscaleSamplesComplex(f, convolvedSamples, inputWav->dataChunk->data);
+    for (int i = 0; i < convolvedSamples; i++) {
+        float scaledSample = *(f + (i * 2));
+        *(inputWav->dataChunk->data + i) = (int16_t)rintf(scaledSample * (maxValue + (scaledSample < 0 ? 1 : 0)));
+    }
 
     double elapsed = (clock() - initial) / (double)CLOCKS_PER_SEC;
     printf("Convolution completed in %.4f seconds\n", elapsed);
@@ -211,12 +215,12 @@ void scaleSamplesComplex(int16_t samples[], int numSamples, double scaled[]) {
     }
 }
 
-void unscaleSamplesComplex(double scaled[], int numSamples, int16_t samples[]) {
-    for (int i = 0; i < numSamples; i++) {
-        float scaledSample = *(scaled + (i * 2));
-        *(samples + i) = (int16_t)rintf(scaledSample * (maxValue + (scaledSample < 0 ? 1 : 0)));
-    }
-}
+// void unscaleSamplesComplex(double scaled[], int numSamples, int16_t samples[]) {
+//     for (int i = 0; i < numSamples; i++) {
+//         float scaledSample = *(scaled + (i * 2));
+//         *(samples + i) = (int16_t)rintf(scaledSample * (maxValue + (scaledSample < 0 ? 1 : 0)));
+//     }
+// }
 
 void createWavFile(char* fileName, WavFile *wavFile) {
     FILE *outputFile = fopen(fileName, "wb");
