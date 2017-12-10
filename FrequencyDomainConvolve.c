@@ -47,11 +47,11 @@ void unscaleSamplesComplex(double scaled[], int numSamples, int16_t samples[]);
 void createWavFile(char* fileName, WavFile *wavFile);
 void reverseEndianness(int size, void *value);
 
-int maxValue;
+//int maxValue;
 
 int main(int argc, char *argv[]) {
 
-    maxValue = (int)pow(2.0, (double)BITS_PER_SAMPLE - 1) - 1;
+    //maxValue = (int)pow(2.0, (double)BITS_PER_SAMPLE - 1) - 1;
     
     char *inputFileName = NULL;
     char *IRfileName = NULL;
@@ -93,12 +93,21 @@ int main(int argc, char *argv[]) {
     double *f = calloc(neededLength, sizeof(double));
     for (int i = 0; i < neededLength; i+=2) {
         *(f + i) = (*(x + i) * *(h + i)) - (*(x + i + 1) * *(h + i + 1));
+        //*(f + i + 1) = (*(x + i + 1) * *(h + i)) + (*(x + i) * *(h + i + 1));
+    }
+    for (int i = 0; i < neededLength; i+=2) {
+        //*(f + i) = (*(x + i) * *(h + i)) - (*(x + i + 1) * *(h + i + 1));
         *(f + i + 1) = (*(x + i + 1) * *(h + i)) + (*(x + i) * *(h + i + 1));
     }
     four1(f - 1, neededLength / 2, -1);
 
     for (int i = 0; i < neededLength; i+=2) {
         *(f + i) = *(f + i) / (double)neededLength;
+        //*(f + i + 1) = *(f + i + 1) / (double)neededLength;
+    }
+
+    for (int i = 0; i < neededLength; i+=2) {
+        //*(f + i) = *(f + i) / (double)neededLength;
         *(f + i + 1) = *(f + i + 1) / (double)neededLength;
     }
 
@@ -112,9 +121,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    double scaleFactor = (double)(maxSample + 0.3);
-
     for (int i = 0; i < neededLength; i++) {
+        double scaleFactor = (double)(maxSample + 0.3);
         double sample = *(f + i);
         *(f + i) = sample / scaleFactor;
     }
@@ -201,6 +209,7 @@ WavFile* loadWav(char* fileName) {
 }
 
 void scaleSamplesComplex(int16_t samples[], int numSamples, double scaled[]) {
+    int maxValue = ((int)pow(2.0, (double)BITS_PER_SAMPLE - 1) - 1);
     for (int i = 0; i < (numSamples * 2); i+=2) {
         int16_t sample = *(samples + (i / 2));
         *(scaled + i) = sample / (float)(maxValue + (sample < 0 ? 1 : 0));
@@ -209,6 +218,7 @@ void scaleSamplesComplex(int16_t samples[], int numSamples, double scaled[]) {
 }
 
 void unscaleSamplesComplex(double scaled[], int numSamples, int16_t samples[]) {
+    int maxValue = ((int)pow(2.0, (double)BITS_PER_SAMPLE - 1) - 1);
     for (int i = 0; i < numSamples; i++) {
         float scaledSample = *(scaled + (i * 2));
         *(samples + i) = (int16_t)rintf(scaledSample * (maxValue + (scaledSample < 0 ? 1 : 0)));
