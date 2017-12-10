@@ -112,8 +112,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    double scaleFactor = (double)(maxSample + 0.3);
     for (int i = 0; i < neededLength; i++) {
-        double scaleFactor = (double)(maxSample + 0.3);
         double sample = *(f + i);
         *(f + i) = sample / scaleFactor;
     }
