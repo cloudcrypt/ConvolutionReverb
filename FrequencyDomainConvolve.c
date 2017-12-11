@@ -1,3 +1,7 @@
+//  
+// Daniel Dastoor
+// FrequencyDomainConvolve.c
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -9,6 +13,7 @@
 #define BITS_PER_SAMPLE     16       
 #define SWAP(a,b)  tempr=(a);(a)=(b);(b)=tempr  
 
+// Structs used for parsing and creating wav files:
 typedef struct FmtChunk {
     char chunkId[4];
     int chunkSize;
@@ -40,6 +45,7 @@ typedef struct WavFile {
     DataChunk *dataChunk;
 } WavFile;
 
+// Function declarations:
 void four1(double data[], int nn, int isign);
 WavFile* loadWav(char* fileName);
 void scaleSamplesComplex(int16_t samples[], int numSamples, double scaled[]);
@@ -71,17 +77,23 @@ int main(int argc, char *argv[]) {
         exit(-1);
     }
 
+    // Load in and parse the two input wav files
     WavFile *inputWav = loadWav(inputFileName);
     WavFile *impulseWav = loadWav(IRfileName);
 
+    // Start timing
     clock_t initial = clock();
 
+    // Get sample lengths
     int inputSamples = inputWav->dataChunk->chunkSize / (BITS_PER_SAMPLE / 8);
     int impulseSamples = impulseWav->dataChunk->chunkSize / (BITS_PER_SAMPLE / 8);
 
+    // Get needed length after padding for FFT
     uint64_t neededLength = (inputSamples > impulseSamples ? inputSamples : impulseSamples) * 2;
     neededLength = pow(2, ceil(log(neededLength)/log(2)));
 
+    // Allocate new array, scale samples into new array, and 
+    // perform FFT on samples for both the imput files
     double *x = calloc(neededLength, sizeof(double));
     scaleSamplesComplex(inputWav->dataChunk->data, inputSamples, x);
     four1(x - 1, neededLength / 2, 1);
@@ -90,6 +102,7 @@ int main(int argc, char *argv[]) {
     scaleSamplesComplex(impulseWav->dataChunk->data, impulseSamples, h);
     four1(h - 1, neededLength / 2, 1);
 
+    // Perform complex multiplication between the result of both FFTs
     double *f = calloc(neededLength, sizeof(double));
     for (int i = 0; i < neededLength; i+=2) {
         double realX = *(x + i);
@@ -99,16 +112,19 @@ int main(int argc, char *argv[]) {
         *(f + i) = (realX * realH) - (imX * imH);
         *(f + i + 1) = (imX * realH) + (realX * imH);
     }
+    // Convert back using the inverse FFT
     four1(f - 1, neededLength / 2, -1);
 
+    // Scale all samples
     for (int i = 0; i < neededLength; i+=2) {
         *(f + i) = *(f + i) / (double)neededLength;
         *(f + i + 1) = *(f + i + 1) / (double)neededLength;
     }
 
+    // Scale all samples by finding the largest one and dividing them
+    // all by the largest + 0.3
     double maxSample = *f;
 
-    // get max, scale by dividing by max!
     for (int i = 0; i < neededLength; i+=2) {
         double sample = *(f + i);
         if (sample > maxSample) {
@@ -122,17 +138,20 @@ int main(int argc, char *argv[]) {
         *(f + i) = sample / scaleFactor;
     }
 
+    // Modify input wav header to use it as output wav header
     int convolvedSamples = inputSamples + impulseSamples - 1;
     int addedBytes = (convolvedSamples - inputSamples) * (BITS_PER_SAMPLE / 8);
     inputWav->header->chunkSize += addedBytes;
     inputWav->dataChunk->chunkSize += addedBytes;
     inputWav->dataChunk = realloc(inputWav->dataChunk, inputWav->dataChunk->chunkSize + 8);
+    // Unscale samples directly into wav file struct
     //unscaleSamplesComplex(f, convolvedSamples, inputWav->dataChunk->data);
     for (int i = 0; i < convolvedSamples; i++) {
         float scaledSample = *(f + (i * 2));
         *(inputWav->dataChunk->data + i) = (int16_t)rintf(scaledSample * (maxValue + (scaledSample < 0 ? 1 : 0)));
     }
 
+    // Get timing
     double elapsed = (clock() - initial) / (double)CLOCKS_PER_SEC;
     printf("Convolution completed in %.4f seconds\n", elapsed);
 
@@ -141,6 +160,15 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
+//  The four1 FFT from Numerical Recipes in C,
+//  p. 507 - 508.
+//  Note:  changed float data types to double.
+//  nn must be a power of 2, and use +1 for
+//  isign for an FFT, and -1 for the Inverse FFT.
+//  The data is complex, so the array size must be
+//  nn*2. This code assumes the array starts
+//  at index 1, not 0, so subtract 1 when
+//  calling the routine (see main() below).
 void four1(double data[], int nn, int isign) {
     unsigned long n, mmax, m, j, istep, i;
     double wtemp, wr, wpr, wpi, wi, theta;
@@ -188,6 +216,7 @@ void four1(double data[], int nn, int isign) {
     }
 }
 
+// Loads a wav file given by the fileName into a WavFile struct
 WavFile* loadWav(char* fileName) {
     WavFile *wavFile = malloc(sizeof(WavFile));
     FILE *file = fopen(fileName, "rb");
@@ -199,14 +228,17 @@ WavFile* loadWav(char* fileName) {
     fclose(file);
 
     wavFile->header = (WavHeader *)wavFile->fileBuf;
+    // Find location of data chunk based on format chunk size
     DataChunk* dataChunk = (DataChunk *)(wavFile->fileBuf + 20 + wavFile->header->fmtChunk.chunkSize);
     wavFile->dataChunk = malloc(dataChunk->chunkSize + 8);
+    // Copy to wav file struct, and realloc to free unused memory
     memcpy(wavFile->dataChunk, dataChunk, dataChunk->chunkSize + 8);
     wavFile->fileBuf = realloc(wavFile->fileBuf, wavFile->header->chunkSize + 8 - (dataChunk->chunkSize + 8));
 
     return wavFile;
 }
 
+// Create array of scaled complex numbers from an array of 16-bit samples
 void scaleSamplesComplex(int16_t samples[], int numSamples, double scaled[]) {
     for (int i = 0; i < (numSamples * 2); i+=2) {
         int16_t sample = *(samples + (i / 2));
@@ -225,7 +257,8 @@ void scaleSamplesComplex(int16_t samples[], int numSamples, double scaled[]) {
 void createWavFile(char* fileName, WavFile *wavFile) {
     FILE *outputFile = fopen(fileName, "wb");
 
-    //int dataChunkSize = wavFile->dataChunk.chunkSize / 2;
+    // Method to reverse endianness of data before writing.
+    // Not currently needed.
 
     // reverseEndianness(sizeof(int), &wavFile->header.chunkSize);
     // reverseEndianness(sizeof(int), &wavFile->header.fmtChunk.chunkSize);
@@ -248,6 +281,7 @@ void createWavFile(char* fileName, WavFile *wavFile) {
     fclose(outputFile);
 }
 
+// Method to reverse endianness of any value upto 4 bytes in length
 void reverseEndianness(int size, void *value) {
     uint8_t reversed[4];
     for (int i = 0; i < size; i++) {

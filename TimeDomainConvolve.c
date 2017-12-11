@@ -1,3 +1,7 @@
+//  
+// Daniel Dastoor
+// TimeDomainConvolve.c
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -8,6 +12,7 @@
 /*  Standard sample size in bits  */
 #define BITS_PER_SAMPLE     16         
 
+// Structs used for parsing and creating wav files:
 typedef struct FmtChunk {
     char chunkId[4];
     int chunkSize;
@@ -39,6 +44,7 @@ typedef struct WavFile {
     DataChunk *dataChunk;
 } WavFile;
 
+// Function declarations:
 void convolve(float x[], int N, float h[], int M, float y[], int P);
 WavFile* loadWav(char* fileName);
 void scaleSamples(int16_t samples[], int numSamples, float scaled[]);
@@ -70,10 +76,15 @@ int main(int argc, char *argv[]) {
         exit(-1);
     }
 
+    // Load in and parse the two input wav files
     WavFile *inputWav = loadWav(inputFileName);
     WavFile *impulseWav = loadWav(IRfileName);
 
+    // Start timing
     clock_t initial = clock();
+
+    // Get sample lengths, allocate new array, and scale samples into new array
+    // for both the imput files
 
     int inputSamples = inputWav->dataChunk->chunkSize / (BITS_PER_SAMPLE / 8);
     float *x = malloc(sizeof(float) * inputSamples);
@@ -83,14 +94,16 @@ int main(int argc, char *argv[]) {
     float *h = malloc(sizeof(float) * impulseSamples);
     scaleSamples(impulseWav->dataChunk->data, impulseSamples, h);
 
+    // Get length of final convolved sample, and allocate new array
     int convolvedSamples = inputSamples + impulseSamples - 1;
     float *y = malloc(sizeof(float) * convolvedSamples);
 
     convolve(x, inputSamples, h, impulseSamples, y, convolvedSamples);
 
+    // Scale all samples by finding the largest one and dividing them
+    // all by the largest + 2.0
     float maxSample = *y;
 
-    // get max, scale by dividing by max!
     for (int i = 0; i < convolvedSamples; i++) {
         float sample = *(y + i);
         if (sample > maxSample) {
@@ -105,12 +118,15 @@ int main(int argc, char *argv[]) {
         *(y + i) = sample / scaleFactor;
     }
 
+    // Modify input wav header to use it as output wav header
     int addedBytes = (convolvedSamples - inputSamples) * (BITS_PER_SAMPLE / 8);
     inputWav->header->chunkSize += addedBytes;
     inputWav->dataChunk->chunkSize += addedBytes;
     inputWav->dataChunk = realloc(inputWav->dataChunk, inputWav->dataChunk->chunkSize + 8);
+    // Unscale samples directly into wav file struct
     unscaleSamples(y, convolvedSamples, inputWav->dataChunk->data);
 
+    // Get timing
     double elapsed = (clock() - initial) / (double)CLOCKS_PER_SEC;
     printf("Convolution completed in %.4f seconds\n", elapsed);
 
@@ -119,6 +135,23 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
+/*****************************************************************************
+*
+*    Function:     convolve
+*
+*    Description:  Convolves two signals, producing an output signal.
+*                  The convolution is done in the time domain using the
+*                  "Input Side Algorithm" (see Smith, p. 112-115).
+*
+*    Parameters:   x[] is the signal to be convolved
+*                  N is the number of samples in the vector x[]
+*                  h[] is the impulse response, which is convolved with x[]
+*                  M is the number of samples in the vector h[]
+*                  y[] is the output signal, the result of the convolution
+*                  P is the number of samples in the vector y[].  P must
+*                       equal N + M - 1
+*
+*****************************************************************************/
 void convolve(float x[], int N, float h[], int M, float y[], int P) {
     int n, m;
 
@@ -150,6 +183,7 @@ void convolve(float x[], int N, float h[], int M, float y[], int P) {
     printf("\n");
 }
 
+// Loads a wav file given by the fileName into a WavFile struct
 WavFile* loadWav(char* fileName) {
     WavFile *wavFile = malloc(sizeof(WavFile));
     FILE *file = fopen(fileName, "rb");
@@ -161,14 +195,17 @@ WavFile* loadWav(char* fileName) {
     fclose(file);
 
     wavFile->header = (WavHeader *)wavFile->fileBuf;
+    // Find location of data chunk based on format chunk size
     DataChunk* dataChunk = (DataChunk *)(wavFile->fileBuf + 20 + wavFile->header->fmtChunk.chunkSize);
     wavFile->dataChunk = malloc(dataChunk->chunkSize + 8);
+    // Copy to wav file struct, and realloc to free unused memory
     memcpy(wavFile->dataChunk, dataChunk, dataChunk->chunkSize + 8);
     wavFile->fileBuf = realloc(wavFile->fileBuf, wavFile->header->chunkSize + 8 - (dataChunk->chunkSize + 8));
 
     return wavFile;
 }
 
+// Create array of scaled float samples from an array of 16-bit samples
 void scaleSamples(int16_t samples[], int numSamples, float scaled[]) {
     for (int i = 0; i < numSamples; i++) {
         int16_t sample = *(samples + i);
@@ -176,6 +213,7 @@ void scaleSamples(int16_t samples[], int numSamples, float scaled[]) {
     }
 }
 
+// Create array of 16-bit samples from an array of scaled float samples
 void unscaleSamples(float scaled[], int numSamples, int16_t samples[]) {
     for (int i = 0; i < numSamples; i++) {
         float scaledSample = *(scaled + i);
@@ -186,7 +224,8 @@ void unscaleSamples(float scaled[], int numSamples, int16_t samples[]) {
 void createWavFile(char* fileName, WavFile *wavFile) {
     FILE *outputFile = fopen(fileName, "wb");
 
-    //int dataChunkSize = wavFile->dataChunk.chunkSize / 2;
+    // Method to reverse endianness of data before writing.
+    // Not currently needed.
 
     // reverseEndianness(sizeof(int), &wavFile->header.chunkSize);
     // reverseEndianness(sizeof(int), &wavFile->header.fmtChunk.chunkSize);
@@ -209,6 +248,7 @@ void createWavFile(char* fileName, WavFile *wavFile) {
     fclose(outputFile);
 }
 
+// Method to reverse endianness of any value upto 4 bytes in length
 void reverseEndianness(int size, void *value) {
     uint8_t reversed[4];
     for (int i = 0; i < size; i++) {
