@@ -1,2 +1,0 @@
-TimeDomainConvolve GuitarDry.wav "BIG HALL E001 M2S.wav" GuitarWet.wav
-Time elapsed: 948 seconds = 15 min 48 sec

@@ -5,6 +5,9 @@
 !.vscode/launch.json
 !.vscode/extensions.json
 
+# Wav files
+*.wav
+
 # Prerequisites
 *.d
 
