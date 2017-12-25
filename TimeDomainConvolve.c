@@ -1,6 +1,5 @@
-//  
-// Daniel Dastoor
 // TimeDomainConvolve.c
+// Daniel Dastoor
 
 #include <stdio.h>
 #include <stdint.h>
